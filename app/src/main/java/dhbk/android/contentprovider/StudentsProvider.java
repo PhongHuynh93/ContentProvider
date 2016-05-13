@@ -7,20 +7,19 @@ package dhbk.android.contentprovider;
 import android.content.ContentProvider;
 import android.content.ContentUris;
 import android.content.ContentValues;
-import android.content.Context;
 import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
+import android.support.annotation.NonNull;
 import android.text.TextUtils;
 
 import java.util.HashMap;
 
 public class StudentsProvider extends ContentProvider {
-    // 1. content provider uri
+    // TODO: 5/13/16 bước 2: tạo uri cho content provider dạng <prefix>://<authority>/<data_type>/<id>
     static final String PROVIDER_NAME = "com.example.provider.College";
     static final String URL = "content://" + PROVIDER_NAME + "/students";
     static final Uri CONTENT_URI = Uri.parse(URL);
@@ -31,94 +30,77 @@ public class StudentsProvider extends ContentProvider {
 
     private static HashMap<String, String> STUDENTS_PROJECTION_MAP;
 
-    static final int STUDENTS = 1;
-    static final int STUDENT_ID = 2;
+    // TODO: 5/13/16 bước 7: trong từng query mà ta gửi đến content provider, phải gán cho nó 1 số int để xác định
+    // tạo 2 dạng int: dạng int cho table và dạng int cho tưng row
+    private static final int STUDENTS = 1;
+    private static final int STUDENT_ID = 2;
 
-    static final UriMatcher uriMatcher;
+    // TODO: 5/13/16 bước 9: match từng uri cho số int
+    private static final UriMatcher uriMatcher = buildUriMatcher();
 
-    static {
-        uriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
-        uriMatcher.addURI(PROVIDER_NAME, "students", STUDENTS);
-        uriMatcher.addURI(PROVIDER_NAME, "students/#", STUDENT_ID);
+    public static UriMatcher buildUriMatcher() {
+        UriMatcher matcher = new UriMatcher(UriMatcher.NO_MATCH);
+        matcher.addURI(PROVIDER_NAME, "students", STUDENTS); // match table.
+        matcher.addURI(PROVIDER_NAME, "students/#", STUDENT_ID); // match each row.
+        return matcher;
     }
 
     /**
      * Database specific constant declarations
      */
     private SQLiteDatabase db;
-    static final String DATABASE_NAME = "College";
-    static final String STUDENTS_TABLE_NAME = "students";
-    static final int DATABASE_VERSION = 1;
-    static final String CREATE_DB_TABLE =
-            " CREATE TABLE " + STUDENTS_TABLE_NAME +
-                    " (_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    " name TEXT NOT NULL, " +
-                    " grade TEXT NOT NULL);";
 
-    /**
-     * Helper class that actually creates and manages
-     * the provider's underlying data repository.
-     */
-    private static class DatabaseHelper extends SQLiteOpenHelper {
-        DatabaseHelper(Context context) {
-            super(context, DATABASE_NAME, null, DATABASE_VERSION);
-        }
 
-        @Override
-        public void onCreate(SQLiteDatabase db) {
-            db.execSQL(CREATE_DB_TABLE);
-        }
-
-        @Override
-        public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-            db.execSQL("DROP TABLE IF EXISTS " + STUDENTS_TABLE_NAME);
-            onCreate(db);
-        }
-    }
-
+    // TODO: 5/13/16 bước 8 :  trong onCreate của content provider , ta gọi hàm tạo database
     @Override
     public boolean onCreate() {
-        Context context = getContext();
-        DatabaseHelper dbHelper = new DatabaseHelper(context);
-
+        DatabaseHelper dbHelper = new DatabaseHelper(getContext());
         /**
          * Create a write able database which will trigger its
          * creation if it doesn't already exist.
          */
         db = dbHelper.getWritableDatabase();
-        return (db == null) ? false : true;
+        return db != null;
     }
 
+    // TODO: 5/13/16 bước 10 hiện thực hàm getType() để trả về đúng loại MIME của kết quả
     @Override
-    public Uri insert(Uri uri, ContentValues values) {
-        /**
-         * Add a new student record
-         */
-        long rowID = db.insert(STUDENTS_TABLE_NAME, "", values);
+    public String getType(@NonNull Uri uri) {
+        switch (uriMatcher.match(uri)) {
+            /**
+             * Get all student records
+             */
+            case STUDENTS:
+                return "vnd.android.cursor.dir/vnd.example.students";
 
-        /**
-         * If record is added successfully
-         */
+            /**
+             * Get a particular student
+             */
+            case STUDENT_ID:
+                return "vnd.android.cursor.item/vnd.example.students";
 
-        if (rowID > 0) {
-            Uri _uri = ContentUris.withAppendedId(CONTENT_URI, rowID);
-            getContext().getContentResolver().notifyChange(_uri, null);
-            return _uri;
+            default:
+                throw new IllegalArgumentException("Unsupported URI: " + uri);
         }
-        throw new SQLException("Failed to add a record into " + uri);
     }
 
+    // TODO: 5/13/16 bươc 11 hiện thực hàm query() để lấy giá trị của 1 table trong databse thích hợp với từng loại yêu cầu của ta (liệt kê hết) khi dc client yêu cầu
     @Override
-    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+    // uri tham số là uri mà từ app khác gọi tới
+    public Cursor query(@NonNull Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+        // tạo query để send đến database
         SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
-        qb.setTables(STUDENTS_TABLE_NAME);
+        // mặc dịnh query table tên là vậy luôn
+        qb.setTables(DatabaseHelper.STUDENTS_TABLE_NAME);
 
+        // so sánh uri tham số với uri của content provider xem xó trùng ko
         switch (uriMatcher.match(uri)) {
             case STUDENTS:
                 qb.setProjectionMap(STUDENTS_PROJECTION_MAP);
                 break;
 
             case STUDENT_ID:
+                // thêm tham số là student ID vào khung query
                 qb.appendWhere(_ID + "=" + uri.getPathSegments().get(1));
                 break;
 
@@ -132,6 +114,8 @@ public class StudentsProvider extends ContentProvider {
              */
             sortOrder = NAME;
         }
+
+        // return kết quả đáp ứng query
         Cursor c = qb.query(db, projection, selection, selectionArgs, null, null, sortOrder);
 
         /**
@@ -141,18 +125,40 @@ public class StudentsProvider extends ContentProvider {
         return c;
     }
 
+    // TODO: 5/13/16 bước 12: insert 1 record dạng ContentValue vào table
     @Override
-    public int delete(Uri uri, String selection, String[] selectionArgs) {
+    public Uri insert(@NonNull Uri uri, ContentValues values) {
+        /**
+         * Add a new student record
+         */
+        long rowID = db.insert(DatabaseHelper.STUDENTS_TABLE_NAME, "", values);
+
+        /**
+         * If record is added successfully
+         */
+
+        // add rồi thì thông báo là content provider này đã dc thay đổi data -> để các app mà có sd content provider này biết
+        if (rowID > 0) {
+            Uri _uri = ContentUris.withAppendedId(CONTENT_URI, rowID);
+            getContext().getContentResolver().notifyChange(_uri, null);
+            return _uri;
+        }
+        throw new SQLException("Failed to add a record into " + uri);
+    }
+
+    // TODO: 5/13/16 hiện thực update / delete content provider
+    @Override
+    public int delete(@NonNull Uri uri, String selection, String[] selectionArgs) {
         int count = 0;
 
         switch (uriMatcher.match(uri)) {
             case STUDENTS:
-                count = db.delete(STUDENTS_TABLE_NAME, selection, selectionArgs);
+                count = db.delete(DatabaseHelper.STUDENTS_TABLE_NAME, selection, selectionArgs);
                 break;
 
             case STUDENT_ID:
                 String id = uri.getPathSegments().get(1);
-                count = db.delete(STUDENTS_TABLE_NAME, _ID + " = " + id +
+                count = db.delete(DatabaseHelper.STUDENTS_TABLE_NAME, _ID + " = " + id +
                         (!TextUtils.isEmpty(selection) ? " AND (" + selection + ')' : ""), selectionArgs);
                 break;
 
@@ -170,11 +176,11 @@ public class StudentsProvider extends ContentProvider {
 
         switch (uriMatcher.match(uri)) {
             case STUDENTS:
-                count = db.update(STUDENTS_TABLE_NAME, values, selection, selectionArgs);
+                count = db.update(DatabaseHelper.STUDENTS_TABLE_NAME, values, selection, selectionArgs);
                 break;
 
             case STUDENT_ID:
-                count = db.update(STUDENTS_TABLE_NAME, values, _ID + " = " + uri.getPathSegments().get(1) +
+                count = db.update(DatabaseHelper.STUDENTS_TABLE_NAME, values, _ID + " = " + uri.getPathSegments().get(1) +
                         (!TextUtils.isEmpty(selection) ? " AND (" + selection + ')' : ""), selectionArgs);
                 break;
 
@@ -183,25 +189,5 @@ public class StudentsProvider extends ContentProvider {
         }
         getContext().getContentResolver().notifyChange(uri, null);
         return count;
-    }
-
-    @Override
-    public String getType(Uri uri) {
-        switch (uriMatcher.match(uri)) {
-            /**
-             * Get all student records
-             */
-            case STUDENTS:
-                return "vnd.android.cursor.dir/vnd.example.students";
-
-            /**
-             * Get a particular student
-             */
-            case STUDENT_ID:
-                return "vnd.android.cursor.item/vnd.example.students";
-
-            default:
-                throw new IllegalArgumentException("Unsupported URI: " + uri);
-        }
     }
 }

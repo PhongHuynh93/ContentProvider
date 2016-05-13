@@ -16,6 +16,7 @@
             </intent-filter>
         </activity>
 
+        <!--TODO bước 1 thêm class con của COntent provider vào android manifest-->
         <provider android:name="StudentsProvider"
             android:authorities="com.example.provider.College">
         </provider>
