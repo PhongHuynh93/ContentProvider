@@ -128,15 +128,17 @@ public class StudentsProvider extends ContentProvider {
     // TODO: 5/13/16 bước 12: insert 1 record dạng ContentValue vào table
     @Override
     public Uri insert(@NonNull Uri uri, ContentValues values) {
-        /**
-         * Add a new student record
-         */
-        long rowID = db.insert(DatabaseHelper.STUDENTS_TABLE_NAME, "", values);
+//         * Add a new student record
+        long rowID;
+        switch (uriMatcher.match(uri)) {
+            case STUDENTS: // nếu ta add vào table Student
+                rowID = db.insert(DatabaseHelper.STUDENTS_TABLE_NAME, null, values);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown URI " + uri);
+        }
 
-        /**
-         * If record is added successfully
-         */
-
+//         * If record is added successfully
         // add rồi thì thông báo là content provider này đã dc thay đổi data -> để các app mà có sd content provider này biết
         if (rowID > 0) {
             Uri _uri = ContentUris.withAppendedId(CONTENT_URI, rowID);
