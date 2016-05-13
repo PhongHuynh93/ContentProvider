@@ -146,7 +146,7 @@ public class StudentsProvider extends ContentProvider {
         throw new SQLException("Failed to add a record into " + uri);
     }
 
-    // TODO: 5/13/16 hiện thực update / delete content provider
+    // TODO: 5/13/16 bước 13 hiện thực update / delete content provider
     @Override
     public int delete(@NonNull Uri uri, String selection, String[] selectionArgs) {
         int count = 0;
